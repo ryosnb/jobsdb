@@ -671,6 +671,9 @@ a.co-logo-link:hover img{opacity:.8;transform:scale(1.05);transition:all .15s}
 .d-agent-memo{margin:12px 0 0;border:1.5px solid #fbbf24;border-radius:8px;overflow:hidden}
 .d-agent-memo-hdr{background:#fef3c7;color:#92400e;font-size:11px;font-weight:800;padding:5px 12px;letter-spacing:.04em;border-bottom:1px solid #fde68a}
 .d-agent-memo-body{padding:10px 12px;font-size:12px;color:var(--tx2);line-height:1.6;background:#fffbeb;white-space:pre-wrap}
+
+/* ── キーワードハイライト ── */
+.kw-hl{background:#fff176;color:#333;border-radius:2px;padding:0 1px}
 </style>
 </head>
 <body>
@@ -877,6 +880,7 @@ function parseBool(q){
 }
 
 let INDEX=[],DETAILS=[],CLOSED_INDEX=[],CLOSED_DETAILS=[],filtered=[],selIdx=-1,curPage=0;
+let _curKws=[];
 const PAGE=200;
 let stimer=null,selCats=new Set(),selWs=new Set();
 function catKey(t,v,m){return JSON.stringify(t==='maj'?{t,v}:{t,v,m});}
@@ -1590,10 +1594,50 @@ function makeQ(r){
     (r.c||'').toLowerCase(),(r.ct||''),(r.cm||''),(r.cs||''),(r.ws||''),
     (r.jt||'').toLowerCase(),(r.jc||'').toLowerCase(),
     (r.sal||'').toLowerCase(),(r.loc||'').toLowerCase(),(r.s||'').toLowerCase(),
-    ((d.ov||d.dut||'').substring(0,400)).toLowerCase(),
-    (d.req||'').substring(0,200).toLowerCase()
+    (d.ov||d.dut||'').toLowerCase(),
+    (d.req||'').toLowerCase(),
+    (d.pref||'').toLowerCase(),
+    (d.per||'').toLowerCase(),
+    (d.ben||'').toLowerCase(),
+    (d.agent_memo||'').toLowerCase()
   ].join(' ');
 }
+
+// ── キーワードハイライト ──
+function extractKeywords(q) {
+  if (!q) return [];
+  // parseBoolと同じトークナイズ
+  const tokens = [];
+  let i = 0; q = q.trim();
+  while (i < q.length) {
+    if (q[i] === ' ') { i++; continue; }
+    if (q[i] === '"') {
+      let j = i + 1;
+      while (j < q.length && q[j] !== '"') j++;
+      tokens.push(q.slice(i+1, j).toLowerCase());
+      i = j + 1; continue;
+    }
+    let j = i;
+    while (j < q.length && q[j] !== ' ' && q[j] !== '(' && q[j] !== ')') j++;
+    const w = q.slice(i, j).toUpperCase();
+    if (w !== 'AND' && w !== 'OR' && w !== 'NOT') tokens.push(q.slice(i, j).toLowerCase());
+    i = j;
+  }
+  return tokens.filter(t => t.length > 0);
+}
+
+function highlightText(text, keywords) {
+  if (!keywords || keywords.length === 0 || !text) return e(text);
+  // エスケープしてからハイライト
+  let escaped = e(text);
+  keywords.forEach(kw => {
+    if (!kw) return;
+    const re = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    escaped = escaped.replace(re, m => `<span class="kw-hl">${m}</span>`);
+  });
+  return escaped;
+}
+
 async function init(){
   document.getElementById('ltxt').textContent='インデックスを展開中...';INDEX=await decompress(IDX_B64);if(CLOSED_IDX_B64){CLOSED_INDEX=await decompress(CLOSED_IDX_B64);CLOSED_DETAILS=await decompress(CLOSED_DET_B64);}
   document.getElementById('ltxt').textContent='詳細データを展開中...';DETAILS=await decompress(DET_B64);
@@ -1659,6 +1703,7 @@ function apply(){
   selCats.forEach(k=>{const obj=JSON.parse(k);if(obj.t==='maj')selMajors.add(obj.v);else{if(!selMids.has(obj.m))selMids.set(obj.m,new Set());selMids.get(obj.m).add(obj.v);}});
   const hasCat=selCats.size>0,hasWs=selWs.size>0,hasLic=selLic.size>0;
   const boolFn=rawQ?parseBool(rawQ):null;
+  _curKws=extractKeywords(rawQ);
   const inclClosed=document.getElementById('chk-closed')?.checked&&CLOSED_INDEX.length>0;const inclClosedOnly=document.getElementById('chk-closed-only')?.checked&&CLOSED_INDEX.length>0;const inclNewOnly=document.getElementById('chk-new-only')?.checked;const searchBase=inclClosedOnly?CLOSED_INDEX:inclClosed?[...INDEX,...CLOSED_INDEX]:INDEX;filtered=searchBase.filter(r=>{
     if(inclNewOnly&&!r.new)return false;
     if(co&&r.c!==co)return false;if(ct&&r.ct!==ct)return false;if(et&&norm_et(r.et)!==et)return false;
@@ -1762,12 +1807,12 @@ function sel(idx,isClosed){
   dhdr.innerHTML=`${isClosed?'<div id="d-closed-banner">🔴 このポジションは募集を終了しています</div>':''}<div id="dhdr-actions-bar">${coBtn}${summaryBtn}${urlBtn}${pubUrlBtn}${jpuBtn}${clipBtn}${txtBtn}</div><div id="dhdr-title-row"><div id="d-co">${ico} ${e(r.c)}</div><div id="d-tt">${r.new?'<span class="new-badge-lg">NEW</span> ':''}${e(r.jt||'（職種未設定）')}</div></div>${(r.acq||r.upd)?`<div id="dhdr-date-row">${r.acq?`<span class="d-date-item d-date-acq"><span class="d-date-lbl">発生確認日</span><span class="d-date-val">${r.acq}</span></span>`:''  }${r.upd?`<span class="d-date-item"><span class="d-date-lbl">データ取得日</span><span class="d-date-val">${r.upd}</span></span>`:''}</div>`:''}<div id="dhdr-meta-row">${(()=>{const pf=r.c==='Amazon Japan G.K.'?(r.amzn_area||''):extractPref(d&&d.loc||r.loc||'');return pf?`<span class="loc-chip" style="font-size:11px;padding:2px 9px">${e(pf)}</span>`:''})()}${r.cm?`<span class="cb-maj">${e(r.cm)}</span>`:''}${r.cs&&r.cs!=='その他'?`<span class="cb-mid">${e(r.cs)}</span>`:''}<span class="tag ts" style="padding:2px 9px">${e(r.s)}</span>${r.ct?`<span class="tag te" style="padding:2px 9px">${e(r.ct)}</span>`:''}${r.et?`<span class="tag" style="background:#d5eee5;color:#177050;padding:2px 9px;font-weight:600">${e(norm_et(r.et)||r.et)}</span>`:''}${salB}${wsBadge}</div>`;
   let h='';
   const gi=[];if(sal)gi.push(['給与',sal.substring(0,80)]);if(d.loc||r.loc)gi.push(['勤務地',(d.loc||r.loc).substring(0,60)]);
-  if(gi.length){h+='<div class="igrid">';gi.forEach(([l,v])=>h+=`<div class="ic"><div class="il">${l}</div><div class="iv">${e(v)}</div></div>`);h+='</div>';}
+  if(gi.length){h+='<div class="igrid">';gi.forEach(([l,v])=>h+=`<div class="ic"><div class="il">${l}</div><div class="iv">${highlightText(v,_curKws)}</div></div>`);h+='</div>';}
   const ep=[d.et,d.prob].filter(Boolean).join(' ｜ ');
   if(ep)h+=`<div class="sec"><div class="sec-t">雇用形態・試用期間</div><div class="sec-b">${e(ep)}</div></div>`;
-  for(const[title,key,hi]of CAND_SECS){const c=d[key];if(!c||!c.trim())continue;h+=`<div class="sec"><div class="sec-t">${title}</div><div class="sec-b${hi?' hi':''}">${e(c)}</div></div>`;}
+  for(const[title,key,hi]of CAND_SECS){const c=d[key];if(!c||!c.trim())continue;h+=`<div class="sec"><div class="sec-t">${title}</div><div class="sec-b${hi?' hi':''}">${highlightText(c,_curKws)}</div></div>`;}
   const hasInt=INT_SECS.some(([,k])=>d[k]&&d[k].trim());
-  if(hasInt){h+=`<div class="int-toggle open" id="int-toggle" onclick="toggleInt()"><span style="font-size:15px">🔒</span><span class="it-label">エージェント内部情報（候補者非開示）</span><span class="it-badge">非公開</span><span class="it-arrow">▾</span></div><div class="int-body open" id="int-body">`;for(const[title,key]of INT_SECS){const c=d[key];if(!c||!c.trim())continue;h+=`<div class="sec"><div class="sec-t">${title}</div><div class="sec-b">${e(c)}</div></div>`;}h+='</div>';}
+  if(hasInt){h+=`<div class="int-toggle open" id="int-toggle" onclick="toggleInt()"><span style="font-size:15px">🔒</span><span class="it-label">エージェント内部情報（候補者非開示）</span><span class="it-badge">非公開</span><span class="it-arrow">▾</span></div><div class="int-body open" id="int-body">`;for(const[title,key]of INT_SECS){const c=d[key];if(!c||!c.trim())continue;h+=`<div class="sec"><div class="sec-t">${title}</div><div class="sec-b">${highlightText(c,_curKws)}</div></div>`;}h+='</div>';}
   const dbody=document.getElementById('dbody');dbody.innerHTML=h;dbody.style.display='block';dbody.scrollTop=0;dbody.style.animation='none';dbody.offsetHeight;dbody.style.animation='fadeSlideIn .25s ease-out forwards';
 }
 
