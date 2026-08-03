@@ -5,7 +5,10 @@
 (function(){
   var PASS = 'ICPA2026';
   var KEY  = 'icpa_auth_ok';
-  if(sessionStorage.getItem('ICPA_auth_ok') === '1') return;
+  var EXPIRE_KEY = 'icpa_auth_expire';
+  var EXPIRE_DAYS = 14;
+  var expire = localStorage.getItem(EXPIRE_KEY);
+  if(localStorage.getItem(KEY) === '1' && expire && Date.now() < parseInt(expire)) return;
   document.addEventListener('DOMContentLoaded', function(){
     // オーバーレイ作成
     var ov = document.createElement('div');
@@ -32,7 +35,7 @@
   window.checkPW = function(){
     var v = document.getElementById('pw-input').value;
     if(v === PASS){
-      sessionStorage.setItem('ICPA_auth_ok','1');
+      localStorage.setItem('icpa_auth_ok','1');localStorage.setItem('icpa_auth_expire',Date.now()+EXPIRE_DAYS*24*60*60*1000);
       var ov = document.getElementById('pw-overlay');
       if(ov) ov.style.display='none';
     } else {
