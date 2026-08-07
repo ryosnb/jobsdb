@@ -390,7 +390,7 @@ body{background:var(--bg);color:var(--tx1);font-family:'Hiragino Kaku Gothic Pro
 #clip-btn:hover{border-color:var(--acc);color:var(--acc);background:#eaf0ff}
 #clip-btn.copied{border-color:var(--acc3);color:var(--acc3);background:#d5eee5}
 #clip-btn svg{width:12px;height:12px;flex-shrink:0}
-#txt-btn{display:flex;align-items:center;gap:5px;background:#fff0f0;border:1.5px solid #e8b4b4;border-radius:7px;padding:5px 12px;cursor:pointer;font-size:12px;color:#b03030;font-weight:600;transition:all .15s;white-space:nowrap}
+#txt-btn,#pdf-btn{display:flex;align-items:center;gap:5px;background:#fff0f0;border:1.5px solid #e8b4b4;border-radius:7px;padding:5px 12px;cursor:pointer;font-size:12px;color:#b03030;font-weight:600;transition:all .15s;white-space:nowrap}
 #txt-btn:hover{border-color:#b03030;color:#fff;background:#b03030}
 #txt-btn.saved{border-color:#0a9470;color:#0a9470;background:#d5eee5}
 #txt-btn svg{width:12px;height:12px;flex-shrink:0}
@@ -729,6 +729,45 @@ a.co-logo-link:hover img{opacity:.8;transform:scale(1.05);transition:all .15s}
 #dhdr-title-row, #dhdr-date-row, #dhdr-meta-row {
   user-select: text !important;
   -webkit-user-select: text !important;
+}
+
+/* ── 印刷（PDF保存）用スタイル ── */
+@media print {
+  /* 詳細パネル（#col-right）以外を全て非表示 */
+  body > * { display: none !important; }
+  #app { display: flex !important; }
+  #col-left, #col-mid, .drag-handle { display: none !important; }
+
+  /* col-rightをフル幅で表示 */
+  #col-right {
+    display: block !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    flex: unset !important;
+  }
+  #dpanel {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  #dbody {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 8px !important;
+  }
+
+  /* 印刷不要なボタン・UI非表示 */
+  .d-actions, #txt-btn, #copy-btn, .d-copy-btn,
+  button, .btn, #dhdr { display: none !important; }
+
+  /* ローディング・オーバーレイ非表示 */
+  #loading, #pw-overlay { display: none !important; }
+
+  body { font-size: 10pt; color: #000; background: #fff; }
+  @page { margin: 15mm; }
 }
 </style>
 </head>
@@ -1911,7 +1950,7 @@ function sel(idx,isClosed){
   const jpuUrl = isSF ? d.url : (d.jpu || '');
   const jpuBtn = jpuUrl ? `<a class="url-btn url-btn-jpu" href="${e(jpuUrl)}" target="_blank" rel="noopener">${EXT_SVG} 一般求人ページ</a>`:'';
   const clipBtn=`<button id="clip-btn" onclick="copyClip()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>候補者向けコピー</button>`;
-  const txtBtn=`<button id="txt-btn" onclick="saveTxt()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>TXTで保存</button>`;
+  const txtBtn=`<button id="txt-btn" onclick="saveTxt()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>TXTで保存</button><button id="pdf-btn" onclick="savePdf()" style="margin-left:6px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>PDFで保存</button>`;
   // 詳細パネル用働き方バッジ（証拠URLリンクボタン付き）
   const wsCls=WS_CLS[r.ws]||'ws-u';
   const wsSrcLink=r.wsu
@@ -1943,6 +1982,9 @@ function copyClip(){
     setTimeout(()=>{btn.classList.remove('copied');btn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>候補者向けコピー`;},2000);
   });
 }
+
+
+function savePdf(){if(selIdx<0)return;window.print();}
 
 function saveTxt(){
   if(selIdx<0)return;
